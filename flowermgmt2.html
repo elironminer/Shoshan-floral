@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>ניהול חנות פרחים</title>
+  <style>
+    body { font-family: "Arial", sans-serif; background: linear-gradient(180deg, #fff0f6, #f7f7f7); margin:20px; font-size:18px; }
+    h1 { color:#8b2c5d; font-size:32px; margin-bottom:10px; }
+    h2 { color:#8b2c5d; font-size:24px; margin-bottom:10px; }
+    h3 { font-size:20px; }
+    .nav { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+    .nav button { padding:12px 18px; font-size:18px; border:none; border-radius:12px; background:#8b2c5d; color:white; cursor:pointer; }
+    .nav button:hover { opacity:0.9; }
+    .section { display:none; }
+    .active { display:block; }
+    .box { background:#ffffff; padding:20px; margin-bottom:20px; border-radius:18px; box-shadow:0 6px 15px rgba(0,0,0,0.1); }
+    label { display:block; margin-top:12px; font-size:18px; }
+    input, select { width:100%; padding:10px; margin-top:6px; font-size:18px; border-radius:10px; border:1px solid #ccc; }
+    button { margin-top:14px; padding:12px; font-size:18px; border:none; border-radius:12px; background:#e75480; color:white; cursor:pointer; width:100%; }
+    table { width:100%; border-collapse:collapse; margin-top:15px; font-size:17px; }
+    th, td { border:1px solid #ddd; padding:10px; text-align:center; }
+    th { background:#f5c2d9; font-weight:bold; }
+    td input { width:70px; font-size:16px; }
+  </style>
+</head>
+<body>
+<h1>🌸 ניהול חנות פרחים</h1>
+<div class="nav">
+  <button type="button" onclick="show('inventory')">📦 מלאי</button>
+  <button type="button" onclick="show('sales')">🛒 מכירה</button>
+  <button type="button" onclick="show('waste')">🗑️ בלאי</button>
+  <button type="button" onclick="show('report')">📊 דוח רווח/הפסד</button>
+</div>
+
+<div id="inventory" class="section active box">
+  <h2>מלאי</h2>
+  <label>שם הפרח <input id="name" /></label>
+  <label>עלות קנייה <input id="buy" type="number" /></label>
+  <label>מחיר מכירה <input id="sell" type="number" /></label>
+  <label>כמות <input id="qty" type="number" /></label>
+  <button type="button" onclick="addOrUpdateFlower()">הוסף/עדכן פרח</button>
+  <table>
+    <thead><tr><th>פרח</th><th>עלות</th><th>מחיר</th><th>כמות</th></tr></thead>
+    <tbody id="inventoryTable"></tbody>
+  </table>
+</div>
+
+<div id="sales" class="section box">
+  <h2>מכירה (כמה פרחים ביחד)</h2>
+  <label>בחר פרח <select id="saleFlower"></select></label>
+  <label>כמות <input id="saleQty" type="number" value="1" min="1" /></label>
+  <button type="button" onclick="addToCart()">➕ הוסף למכירה</button>
+  <h3>🧺 סל מכירה</h3>
+  <table>
+    <thead><tr><th>פרח</th><th>כמות</th><th>רווח</th></tr></thead>
+    <tbody id="cartTable"></tbody>
+  </table>
+  <button type="button" onclick="finalizeSale()">✅ סגור מכירה</button>
+</div>
+
+<div id="waste" class="section box">
+  <h2>בלאי / פרחים שנזרקו</h2>
+  <label>בחר פרח <select id="wasteFlower"></select></label>
+  <label>כמות שנזרקה <input id="wasteQty" type="number" value="1" min="1" /></label>
+  <button type="button" onclick="addWaste()">➖ עדכן בלאי</button>
+</div>
+
+<div id="report" class="section box">
+  <h2>דוח רווח / הפסד</h2>
+  <p>רווח כולל: <strong id="profit">0</strong> ₪</p>
+</div>
+
+<script>
+let flowers = JSON.parse(localStorage.getItem('flowers') || '[]');
+let totalProfit = Number(localStorage.getItem('profit') || 0);
+let totalWaste = Number(localStorage.getItem('waste') || 0);
+let cart = [];
+
+function save() {
+  localStorage.setItem('flowers', JSON.stringify(flowers));
+  localStorage.setItem('profit', totalProfit);
+  localStorage.setItem('waste', totalWaste);
+}
+
+function show(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function addOrUpdateFlower() {
+  const n = document.getElementById('name').value;
+  const b = +document.getElementById('buy').value;
+  const s = +document.getElementById('sell').value;
+  const q = +document.getElementById('qty').value;
+  if (!n) return alert('חסר שם פרח');
+
+  const existing = flowers.find(f => f.name === n);
+  if (existing) {
+    existing.buy = b;
+    existing.sell = s;
+    existing.qty += q;
+  } else {
+    flowers.push({ name: n, buy: b, sell: s, qty: q });
+  }
+  save(); render();
+}
+
+function addToCart() {
+  const i = document.getElementById('saleFlower').value;
+  const q = +document.getElementById('saleQty').value;
+  if (flowers[i].qty < q) return alert('אין מספיק מלאי');
+  cart.push({ index: i, qty: q });
+  renderCart();
+}
+
+function finalizeSale() {
+  cart.forEach(item => {
+    const f = flowers[item.index];
+    f.qty -= item.qty;
+    totalProfit += item.qty * (f.sell - f.buy);
+  });
+  cart = [];
+  save(); render();
+}
+
+function addWaste() {
+  const i = document.getElementById('wasteFlower').value;
+  const q = +document.getElementById('wasteQty').value;
+  if (flowers[i].qty < q) return alert('אין מספיק מלאי');
+  flowers[i].qty -= q;
+  totalWaste += q * flowers[i].buy;
+  totalProfit -= q * flowers[i].buy;
+  save(); render();
+}
+
+function render() {
+  const inventoryTable = document.getElementById('inventoryTable');
+  const saleFlower = document.getElementById('saleFlower');
+  const wasteFlower = document.getElementById('wasteFlower');
+  inventoryTable.innerHTML = '';
+  saleFlower.innerHTML = '';
+  wasteFlower.innerHTML = '';
+  flowers.forEach((f, i) => {
+    inventoryTable.innerHTML += `<tr><td>${f.name}</td><td><input type='number' value='${f.buy}' onchange='updateFlower(${i},"buy",this.value)'></td><td><input type='number' value='${f.sell}' onchange='updateFlower(${i},"sell",this.value)'></td><td><input type='number' value='${f.qty}' onchange='updateFlower(${i},"qty",this.value)'></td></tr>`;
+    if (f.qty > 0) {
+      saleFlower.innerHTML += `<option value='${i}'>${f.name} (${f.qty})</option>`;
+      wasteFlower.innerHTML += `<option value='${i}'>${f.name} (${f.qty})</option>`;
+    }
+  });
+  document.getElementById('profit').innerText = totalProfit;
+  renderCart();
+}
+
+function updateFlower(index, field, value) {
+  flowers[index][field] = +value;
+  save(); render();
+}
+
+function renderCart() {
+  const cartTable = document.getElementById('cartTable');
+  cartTable.innerHTML = '';
+  cart.forEach(c => {
+    const f = flowers[c.index];
+    cartTable.innerHTML += `<tr><td>${f.name}</td><td>${c.qty}</td><td>${c.qty*(f.sell-f.buy)}</td></tr>`;
+  });
+}
+
+render();
+</script>
+</body>
+</html>
